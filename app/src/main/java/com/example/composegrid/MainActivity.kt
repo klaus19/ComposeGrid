@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,6 +38,14 @@ import com.example.composegrid.ui.theme.ComposeGridTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CardDefaults.cardColors
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
@@ -58,12 +67,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
-
 @Composable
 fun PlayScreen() {
+    var selectedImageId by remember { mutableStateOf(-1) }
+    var selectedNameValue by remember { mutableStateOf("") }
     // Generate the list of images and names as key-value pairs
     val imageNamesMap = generateImageNamesMap()
+    val randomKeys by remember { mutableStateOf(imageNamesMap.values.toList().shuffled()) }
+    var selectedIndex by remember { mutableStateOf(-1) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -76,94 +87,132 @@ fun PlayScreen() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             // First column for images (keys)
-            CardColumn(imageNamesMap.keys.toList())
+            CardColumn(
+                imageNamesMap.keys.toList(),
+                isNamesColumn = false,
+                selectedId = selectedImageId,
+                onCardClick = { clickedImageId ->
+                    // Check if the clicked image card is different from the currently selected image card
+                    if (clickedImageId != selectedImageId) {
+                        selectedImageId = clickedImageId as Int
+                        selectedNameValue = "" // Reset the selected name value
+                    }
+                }
+            )
 
             // Second column for names (values)
-            CardColumn(imageNamesMap.values.toList(), true)
+            CardColumn(
+                randomKeys,
+                isNamesColumn = true,
+                selectedId = selectedNameValue,
+                selectedIndex = selectedIndex,
+                onCardClick = {
+                    if (imageNamesMap.getOrDefault(selectedImageId, "") == it) {
+                        selectedNameValue = it // Unique ID for name
+                        selectedIndex = -1
+                    } else {
+                        selectedNameValue = "" // Reset if it's incorrect
+                        selectedIndex = randomKeys.indexOf(it)
+                    }
+                }
+            )
         }
     }
 }
 
 
-
 @Composable
-fun CardColumn(items: List<Any>, isNamesColumn: Boolean = false) {
+fun CardColumn(
+    dataImage: List<Any>,
+    isNamesColumn: Boolean = false,
+    selectedId: Any,
+    selectedIndex: Int = -1,
+    onCardClick: (Any) -> Unit
+) {
     LazyColumn(
         modifier = Modifier.padding(start = if (isNamesColumn) 16.dp else 0.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(items) { item ->
-            Card(modifier = Modifier.size(100.dp).padding(start = 30.dp, top = 20.dp)) {
+        itemsIndexed(dataImage) {index, item ->
+            val isSelected = if (isNamesColumn) {
+                item.toString() == selectedId as String
+            } else {
+                item as Int == selectedId as Int
+            }
+
+            Card(
+                modifier = Modifier
+                    .size(100.dp)
+                    .padding(start = 30.dp, top =    20.dp)
+                    .clickable {
+                        onCardClick(item)
+                    },
+                colors = cardColors( containerColor = when {
+                    isSelected -> Color.Green
+                    else -> if (selectedIndex != -1 && selectedIndex == index) Color.Red else Color.LightGray
+                })
+            ) {
                 if (isNamesColumn) {
-                    NameItem(name = item as String)
+                    NameItem(name = item as String, isSelected = isSelected)
                 } else {
-                    ImageItem(imageResId = item as Int)
+                    ImageItem(imageResId = item as Int, isSelected = isSelected)
                 }
             }
         }
     }
 }
 
-
-fun generateImageNamesMap(): HashMap<Int, String> {
+fun generateImageNamesMap(): Map<Int, String> {
     // Add image resources to a list
     val images = listOf(
-        R.drawable.he,
-        R.drawable.how,
-        R.drawable.what,
         R.drawable.we,
+        R.drawable.what,
+        R.drawable.how,
+        R.drawable.he,
         // Add more image resources as needed
     )
 
     // Add image names to a list in random order
     val imageNames = listOf(
-        "Name1",
-        "Name2",
-        "Name3",
-        "Name4",
-        "Name5"
+        "we",
+        "what",
+        "how",
+        "he",
         // Add more image names corresponding to the resources
     )
 
-    // Shuffle the image names list randomly
-    val shuffledNames = imageNames.shuffled()
-
-    // Use the shuffled names to assign each image resource ID a corresponding name in the imageNamesMap
-    val imageNamesMap = HashMap<Int, String>()
-    for (i in images.indices) {
-        imageNamesMap[images[i]] = shuffledNames[i]
-    }
-
-    return imageNamesMap
+    // Use the 'zip' function to pair the images with the shuffled names and then convert it to a map
+    return images.zip(imageNames).toMap()
 }
 
 @Composable
-fun ImageItem(imageResId: Int) {
+fun ImageItem(imageResId: Int, isSelected: Boolean) {
     val painter: Painter = painterResource(id = imageResId)
     Image(
         painter = painter,
-        contentDescription = null, // Provide proper content description if needed
+        contentDescription = null,
         modifier = Modifier
             .size(120.dp)
-            .padding(8.dp)
+            .padding(8.dp),
+        contentScale = ContentScale.Crop,
+        alignment = if (isSelected) Alignment.TopCenter else Alignment.Center
     )
 }
 
 @Composable
-fun NameItem(name: String) {
+fun NameItem(name: String, isSelected: Boolean) {
     Text(
         text = name,
         style = TextStyle(
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.typography.bodyMedium.color,
             textAlign = TextAlign.Center
         ),
         modifier = Modifier
             .padding(8.dp)
+            .fillMaxWidth(),
     )
 }
-
 
 @Preview(showBackground = true)
 @Composable

@@ -15,7 +15,7 @@ class PractiseViewModel:ViewModel() {
 
     init {
         viewModelScope.launch {
-          //  _imageInfoList.value = generateImageList()
+           // _imageInfoList.value = generateImageNamesMap()
         }
     }
 }
